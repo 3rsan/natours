@@ -6138,9 +6138,8 @@ var runtime = (function (exports) {
           throw arg;
         }
 
-        // Be forgiving, per GeneratorResume behavior specified since ES2015:
-        // ES2015 spec, step 3: https://262.ecma-international.org/6.0/#sec-generatorresume
-        // Latest spec, step 2: https://tc39.es/ecma262/#sec-generatorresume
+        // Be forgiving, per 25.3.3.3.3 of the spec:
+        // https://people.mozilla.org/~jorendorff/es6-draft.html#sec-generatorresume
         return doneResult();
       }
 
@@ -6213,7 +6212,7 @@ var runtime = (function (exports) {
     var method = delegate.iterator[methodName];
     if (method === undefined) {
       // A .throw or .return when the delegate iterator has no .throw
-      // method, or a missing .next method, always terminate the
+      // method, or a missing .next mehtod, always terminate the
       // yield* loop.
       context.delegate = null;
 
@@ -6367,7 +6366,7 @@ var runtime = (function (exports) {
   };
 
   function values(iterable) {
-    if (iterable != null) {
+    if (iterable) {
       var iteratorMethod = iterable[iteratorSymbol];
       if (iteratorMethod) {
         return iteratorMethod.call(iterable);
@@ -6397,7 +6396,8 @@ var runtime = (function (exports) {
       }
     }
 
-    throw new TypeError(typeof iterable + " is not iterable");
+    // Return an iterator with no values.
+    return { next: doneResult };
   }
   exports.values = values;
 
@@ -10008,7 +10008,7 @@ function encode(val) {
  *
  * @param {string} url The base of the url (e.g., http://www.google.com)
  * @param {object} [params] The params to be appended
- * @param {?object} options
+ * @param {?(object|Function)} options
  *
  * @returns {string} The formatted url
  */
@@ -10018,6 +10018,11 @@ function buildURL(url, params, options) {
     return url;
   }
   const _encode = options && options.encode || encode;
+  if (_utils.default.isFunction(options)) {
+    options = {
+      serialize: options
+    };
+  }
   const serializeFn = options && options.serialize;
   let serializedParams;
   if (serializeFn) {
@@ -10997,70 +11002,19 @@ exports.progressEventDecorator = progressEventDecorator;
 const asyncDecorator = fn => (...args) => _utils.default.asap(() => fn(...args));
 exports.asyncDecorator = asyncDecorator;
 },{"./speedometer.js":"../../node_modules/axios/lib/helpers/speedometer.js","./throttle.js":"../../node_modules/axios/lib/helpers/throttle.js","../utils.js":"../../node_modules/axios/lib/utils.js"}],"../../node_modules/axios/lib/helpers/isURLSameOrigin.js":[function(require,module,exports) {
-'use strict';
+"use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.default = void 0;
-var _utils = _interopRequireDefault(require("./../utils.js"));
 var _index = _interopRequireDefault(require("../platform/index.js"));
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
-var _default = exports.default = _index.default.hasStandardBrowserEnv ?
-// Standard browser envs have full support of the APIs needed to test
-// whether the request URL is of the same origin as current location.
-function standardBrowserEnv() {
-  const msie = _index.default.navigator && /(msie|trident)/i.test(_index.default.navigator.userAgent);
-  const urlParsingNode = document.createElement('a');
-  let originURL;
-
-  /**
-  * Parse a URL to discover its components
-  *
-  * @param {String} url The URL to be parsed
-  * @returns {Object}
-  */
-  function resolveURL(url) {
-    let href = url;
-    if (msie) {
-      // IE needs attribute set twice to normalize properties
-      urlParsingNode.setAttribute('href', href);
-      href = urlParsingNode.href;
-    }
-    urlParsingNode.setAttribute('href', href);
-
-    // urlParsingNode provides the UrlUtils interface - http://url.spec.whatwg.org/#urlutils
-    return {
-      href: urlParsingNode.href,
-      protocol: urlParsingNode.protocol ? urlParsingNode.protocol.replace(/:$/, '') : '',
-      host: urlParsingNode.host,
-      search: urlParsingNode.search ? urlParsingNode.search.replace(/^\?/, '') : '',
-      hash: urlParsingNode.hash ? urlParsingNode.hash.replace(/^#/, '') : '',
-      hostname: urlParsingNode.hostname,
-      port: urlParsingNode.port,
-      pathname: urlParsingNode.pathname.charAt(0) === '/' ? urlParsingNode.pathname : '/' + urlParsingNode.pathname
-    };
-  }
-  originURL = resolveURL(window.location.href);
-
-  /**
-  * Determine if a URL shares the same origin as the current location
-  *
-  * @param {String} requestURL The URL to test
-  * @returns {boolean} True if URL shares the same origin, otherwise false
-  */
-  return function isURLSameOrigin(requestURL) {
-    const parsed = _utils.default.isString(requestURL) ? resolveURL(requestURL) : requestURL;
-    return parsed.protocol === originURL.protocol && parsed.host === originURL.host;
-  };
-}() :
-// Non standard browser envs (web workers, react-native) lack needed support.
-function nonStandardBrowserEnv() {
-  return function isURLSameOrigin() {
-    return true;
-  };
-}();
-},{"./../utils.js":"../../node_modules/axios/lib/utils.js","../platform/index.js":"../../node_modules/axios/lib/platform/index.js"}],"../../node_modules/axios/lib/helpers/cookies.js":[function(require,module,exports) {
+var _default = exports.default = _index.default.hasStandardBrowserEnv ? ((origin, isMSIE) => url => {
+  url = new URL(url, _index.default.origin);
+  return origin.protocol === url.protocol && origin.host === url.host && (isMSIE || origin.port === url.port);
+})(new URL(_index.default.origin), _index.default.navigator && /(msie|trident)/i.test(_index.default.navigator.userAgent)) : () => true;
+},{"../platform/index.js":"../../node_modules/axios/lib/platform/index.js"}],"../../node_modules/axios/lib/helpers/cookies.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -11188,7 +11142,7 @@ function mergeConfig(config1, config2) {
   // eslint-disable-next-line no-param-reassign
   config2 = config2 || {};
   const config = {};
-  function getMergedValue(target, source, caseless) {
+  function getMergedValue(target, source, prop, caseless) {
     if (_utils.default.isPlainObject(target) && _utils.default.isPlainObject(source)) {
       return _utils.default.merge.call({
         caseless
@@ -11202,11 +11156,11 @@ function mergeConfig(config1, config2) {
   }
 
   // eslint-disable-next-line consistent-return
-  function mergeDeepProperties(a, b, caseless) {
+  function mergeDeepProperties(a, b, prop, caseless) {
     if (!_utils.default.isUndefined(b)) {
-      return getMergedValue(a, b, caseless);
+      return getMergedValue(a, b, prop, caseless);
     } else if (!_utils.default.isUndefined(a)) {
-      return getMergedValue(undefined, a, caseless);
+      return getMergedValue(undefined, a, prop, caseless);
     }
   }
 
@@ -11263,7 +11217,7 @@ function mergeConfig(config1, config2) {
     socketPath: defaultToConfig2,
     responseEncoding: defaultToConfig2,
     validateStatus: mergeDirectKeys,
-    headers: (a, b) => mergeDeepProperties(headersToObject(a), headersToObject(b), true)
+    headers: (a, b, prop) => mergeDeepProperties(headersToObject(a), headersToObject(b), prop, true)
   };
   _utils.default.forEach(Object.keys(Object.assign({}, config1, config2)), function computeConfigValue(prop) {
     const merge = mergeMap[prop] || mergeDeepProperties;
@@ -11971,7 +11925,7 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.VERSION = void 0;
-const VERSION = exports.VERSION = "1.7.7";
+const VERSION = exports.VERSION = "1.7.9";
 },{}],"../../node_modules/axios/lib/helpers/validator.js":[function(require,module,exports) {
 'use strict';
 
@@ -12017,6 +11971,13 @@ validators.transitional = function transitional(validator, version, message) {
       console.warn(formatMessage(opt, ' has been deprecated since v' + version + ' and will be removed in the near future'));
     }
     return validator ? validator(value, opt, opts) : true;
+  };
+};
+validators.spelling = function spelling(correctSpelling) {
+  return (value, opt) => {
+    // eslint-disable-next-line no-console
+    console.warn(`${opt} is likely a misspelling of ${correctSpelling}`);
+    return true;
   };
 };
 
@@ -12103,8 +12064,8 @@ class Axios {
       return await this._request(configOrUrl, config);
     } catch (err) {
       if (err instanceof Error) {
-        let dummy;
-        Error.captureStackTrace ? Error.captureStackTrace(dummy = {}) : dummy = new Error();
+        let dummy = {};
+        Error.captureStackTrace ? Error.captureStackTrace(dummy) : dummy = new Error();
 
         // slice off the Error: ... line
         const stack = dummy.stack ? dummy.stack.replace(/^.+\n/, '') : '';
@@ -12156,6 +12117,10 @@ class Axios {
         }, true);
       }
     }
+    _validator.default.assertOptions(config, {
+      baseUrl: validators.spelling('baseURL'),
+      withXsrfToken: validators.spelling('withXSRFToken')
+    }, true);
 
     // Set config.method
     config.method = (config.method || this.defaults.method || 'get').toLowerCase();
@@ -12699,7 +12664,7 @@ var login = exports.login = /*#__PURE__*/function () {
           _context.next = 4;
           return (0, _axios.default)({
             method: 'POST',
-            url: 'http://localhost:3000/api/v1/users/login',
+            url: 'https://natours-8gpz.onrender.com/api/v1/users/login',
             data: {
               email: email,
               password: password
@@ -12739,7 +12704,7 @@ var logout = exports.logout = /*#__PURE__*/function () {
           _context2.next = 3;
           return (0, _axios.default)({
             method: 'GET',
-            url: 'http://localhost:3000/api/v1/users/logout'
+            url: 'https://natours-8gpz.onrender.com/api/v1/users/logout'
           });
         case 3:
           res = _context2.sent;
@@ -12782,7 +12747,7 @@ var updateSettings = exports.updateSettings = /*#__PURE__*/function () {
       while (1) switch (_context.prev = _context.next) {
         case 0:
           _context.prev = 0;
-          url = type === 'password' ? 'http://localhost:3000/api/v1/users/updateMyPassword' : 'http://localhost:3000/api/v1/users/updateMe';
+          url = type === 'password' ? 'https://natours-8gpz.onrender.com/api/v1/users/updateMyPassword' : 'https://natours-8gpz.onrender.com/api/v1/users/updateMe';
           _context.next = 4;
           return (0, _axios.default)({
             method: 'PATCH',
@@ -13093,7 +13058,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "59155" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "52986" + '/');
   ws.onmessage = function (event) {
     checkedAssets = {};
     assetsToAccept = [];
