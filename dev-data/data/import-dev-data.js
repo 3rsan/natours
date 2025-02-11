@@ -14,14 +14,13 @@ if (process.env.DATABASE !== undefined) {
     '<PASSWORD>',
     process.env.DATABASE_PASSWORD
   );
+  mongoose
+    .connect(DB, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    })
+    .then(() => console.log('DB connection successfull!'));
 }
-
-mongoose
-  .connect(DB, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-  })
-  .then(() => console.log('DB connection successfull!'));
 
 // READ JSON FILE
 const tours = JSON.parse(fs.readFileSync(`${__dirname}/tours.json`, 'utf-8'));
