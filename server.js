@@ -1,3 +1,6 @@
+console.log('DATABASE:', process.env.DATABASE);
+console.log('DATABASE_PASSWORD:', process.env.DATABASE_PASSWORD);
+
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 
