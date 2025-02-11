@@ -7,20 +7,17 @@ const Review = require('./../../models/reviewModel');
 
 dotenv.config({ path: './config.env' });
 
-let DB;
+const DB = process.env.DATABASE.replace(
+  '<PASSWORD>',
+  process.env.DATABASE_PASSWORD
+);
 
-if (process.env.DATABASE !== undefined) {
-  DB = process.env.DATABASE.replace(
-    '<PASSWORD>',
-    process.env.DATABASE_PASSWORD
-  );
-  mongoose
-    .connect(DB, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    })
-    .then(() => console.log('DB connection successfull!'));
-}
+mongoose
+  .connect(DB, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  })
+  .then(() => console.log('DB connection successfull!'));
 
 // READ JSON FILE
 const tours = JSON.parse(fs.readFileSync(`${__dirname}/tours.json`, 'utf-8'));
